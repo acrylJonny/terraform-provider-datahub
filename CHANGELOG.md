@@ -7,9 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-10-14
+
+### Security
+
+- **The provider is now built with Go 1.27.2 and `golang.org/x/net` 0.60.0, which fix eleven advisories that `govulncheck` reports as reachable from this code**: `net/http` (GO-2026-6613, GO-2026-6605 and the HTTP/2 findings GO-2026-6617, GO-2026-6612, GO-2026-6611, GO-2026-6610 and GO-2026-6603), `crypto/tls` (GO-2026-6607), `mime/multipart` (GO-2026-6608) and `html/template` (GO-2026-6600 and GO-2026-6599). The five HTTP/2 findings are also fixed in `golang.org/x/net` 0.60.0. They are of the denial-of-service, request-smuggling and template-escaping classes, and most concern HTTP servers. A provider is an HTTP client that talks to Terraform over a local plugin socket, so practical exposure was limited, but a released binary built from Go 1.27.1 still carries the vulnerable standard library and one built from 1.27.2 does not. Nothing in the provider's own code changed.
+
+  **Affected versions: 0.26.0, which was built with Go 1.27.1, and every earlier release**, all of which were built with the same Go or older and so carry these findings or comparable ones. **There is nothing to rotate or reconfigure -- upgrading the provider is the whole fix.**
+
+  Selected via a `toolchain go1.27.2` directive in all three `go.mod` files rather than by waiting on the development tool manager. Go downloads the named toolchain itself, so this applies to CI and to anyone who clones the repository. The `go` directive is unchanged: it declares the minimum language version, not the compiler.
+
 ### Changed
 
 - **A malformed dataset URN is now rejected at `terraform plan`** rather than when the apply reaches the server. This applies to `entity_urn` on `datahub_freshness_assertion`, `datahub_volume_assertion`, `datahub_sql_assertion`, `datahub_field_assertion` and `datahub_schema_assertion`, and to `dataset_urn` on `datahub_data_contract`. The check is shape-only: the `urn:li:dataset:(` prefix and closing `)`, exactly three comma-separated parts, a `urn:li:dataPlatform:<id>` platform, a non-empty name, and an environment written as upper-case words joined by single underscores (for example `PROD` or `NON_PROD`). It holds no list of platforms or environments, so it is looser than the server, which additionally requires the environment to be a DataHub `FabricType` value. **If a pipeline fails after upgrading with `Invalid dataset URN`, the URN in that configuration is not shaped like a dataset URN**, and the error names the part that is wrong. Correct the URN; if you believe a well-formed URN is being rejected, please open an issue. URNs built from another resource's output are unknown at plan time and are not checked. `datahub_custom_assertion` is unchanged because its `entity_urn` is not restricted to datasets.
+
+- **Development tooling was refreshed, and the duplicated version pins were removed.** Terraform is now 1.16.5, GoReleaser 2.18.3, golangci-lint 2.14.0, yq 4.54.1 and uv 0.13.0. `golangci-lint` and `goreleaser` are installed from `mise.toml` in CI and in the release job instead of being pinned a second time in the workflows, so a bump in one place can no longer leave the other behind. Nothing here changes the provider's behaviour.
 
 ## [0.26.0] - 2026-09-22
 
@@ -528,7 +540,8 @@ Initial public release.
   `DATAHUB_GMS_URL`/`DATAHUB_GMS_TOKEN` environment variables, or
   `~/.datahubenv` (DataHub CLI config).
 
-[Unreleased]: https://github.com/datahub-project/terraform-provider-datahub/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/datahub-project/terraform-provider-datahub/compare/v0.27.0...HEAD
+[0.27.0]: https://github.com/datahub-project/terraform-provider-datahub/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/datahub-project/terraform-provider-datahub/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/datahub-project/terraform-provider-datahub/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/datahub-project/terraform-provider-datahub/compare/v0.24.0...v0.24.1
