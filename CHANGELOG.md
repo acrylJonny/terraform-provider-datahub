@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-10-23
+
 ### Security
 
 - **The provider is now built with Go 1.27.3, which fixes GO-2026-6809 (CVE-2026-111943) in `crypto/x509`, reported by `govulncheck` as reachable from this code.** Go 1.27.3 adds a denylist of intermediate certificates that are no longer trustworthy, so that `Certificate.Verify` rejects a chain through one of them even on a platform whose system trust store has not been updated to distrust it. Unlike most of the advisories fixed in 0.27.0, this one is on the client side: the provider verifies the DataHub server's TLS certificate on every request it makes, so this is the code path every HTTPS connection to DataHub goes through. **Affected versions: 0.27.0 and every earlier release.** There is nothing to rotate or reconfigure, and upgrading the provider is the whole fix.
@@ -560,7 +562,8 @@ Initial public release.
   `DATAHUB_GMS_URL`/`DATAHUB_GMS_TOKEN` environment variables, or
   `~/.datahubenv` (DataHub CLI config).
 
-[Unreleased]: https://github.com/datahub-project/terraform-provider-datahub/compare/v0.27.0...HEAD
+[Unreleased]: https://github.com/datahub-project/terraform-provider-datahub/compare/v0.27.1...HEAD
+[0.27.1]: https://github.com/datahub-project/terraform-provider-datahub/compare/v0.27.0...v0.27.1
 [0.27.0]: https://github.com/datahub-project/terraform-provider-datahub/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/datahub-project/terraform-provider-datahub/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/datahub-project/terraform-provider-datahub/compare/v0.24.1...v0.25.0
