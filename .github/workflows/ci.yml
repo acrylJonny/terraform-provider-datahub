@@ -69,7 +69,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
@@ -79,7 +79,9 @@ jobs:
       # prerequisite builds ./bin/terraform-provider-datahub. Without it
       # TestAcc_ImportRoundtrip_E2E found no binary and skipped on every run,
       # which left the whole import pipeline untested behind a green job.
-      - run: make coverage COVERAGE_TIMEOUT=5m
+      # The provider package alone takes 4-5 minutes, so the go test timeout
+      # needs headroom over that, and the job timeout over the go test one.
+      - run: make coverage COVERAGE_TIMEOUT=12m
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
