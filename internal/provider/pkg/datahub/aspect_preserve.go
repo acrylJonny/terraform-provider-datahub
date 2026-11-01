@@ -4,11 +4,13 @@
 package datahub
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 // unmanagedAspectFields reads the current value of an aspect and returns it
@@ -22,7 +24,9 @@ import (
 // fields added to the aspect in later DataHub versions. A missing entity or
 // aspect returns an empty map.
 func (c *Client) unmanagedAspectFields(ctx context.Context, entityPath, urn, aspectName string, managed []string) (map[string]any, error) {
-	path := fmt.Sprintf("/openapi/v3/entity/%s/%s", entityPath, urn)
+	// aspects= limits the response to the one aspect being preserved; the
+	// entity endpoint otherwise returns every aspect the entity has.
+	path := fmt.Sprintf("/openapi/v3/entity/%s/%s?aspects=%s", entityPath, urn, url.QueryEscape(aspectName))
 	req, err := c.NewRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("building %s read request: %w", aspectName, err)
@@ -53,7 +57,12 @@ func (c *Client) unmanagedAspectFields(ctx context.Context, entityPath, urn, asp
 		Value map[string]any `json:"value"`
 	}
 	if raw, ok := entity[aspectName]; ok {
-		if err := json.Unmarshal(raw, &aspect); err != nil {
+		// UseNumber keeps numbers as json.Number, which writes back the exact
+		// literal it read. Plain decoding goes through float64 and rounds PDL
+		// longs above 2^53, corrupting fields the caller never touched.
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.UseNumber()
+		if err := dec.Decode(&aspect); err != nil {
 			return nil, fmt.Errorf("parsing %s aspect: %w", aspectName, err)
 		}
 	}
