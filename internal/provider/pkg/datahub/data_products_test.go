@@ -98,6 +98,40 @@ func TestWriteDataProductProperties(t *testing.T) {
 			t.Errorf("assets = %v, want absent on create", stored["assets"])
 		}
 	})
+
+	// An entity can exist without this aspect, e.g. with only its key aspect.
+	// The read then succeeds with nothing to preserve, and the write must go
+	// ahead with just the managed fields rather than failing.
+	t.Run("entity_without_aspect", func(t *testing.T) {
+		var posted map[string]any
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case http.MethodGet:
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"urn":"` + urn + `","dataProductKey":{"value":{"id":"orders"}}}`))
+			case http.MethodPost:
+				var payload []struct {
+					Props struct {
+						Value map[string]any `json:"value"`
+					} `json:"dataProductProperties"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+					t.Errorf("decoding POST payload: %v", err)
+				}
+				posted = payload[0].Props.Value
+				_, _ = w.Write([]byte("[]"))
+			}
+		}))
+		defer server.Close()
+		c := newTestClient(t, server)
+
+		if err := c.WriteDataProductProperties(t.Context(), urn, "Orders", "desc", "", nil, ""); err != nil {
+			t.Fatalf("WriteDataProductProperties() error = %v", err)
+		}
+		if posted["name"] != "Orders" || posted["description"] != "desc" {
+			t.Errorf("posted = %v, want name and description written", posted)
+		}
+	})
 }
 
 // TestWriteDataProductPropertiesReadFailure pins the safety property the
@@ -112,8 +146,10 @@ func TestWriteDataProductPropertiesReadFailure(t *testing.T) {
 		name    string
 		status  int
 		body    string
+		hangup  bool // drop the connection instead of answering the GET
 		wantErr string
 	}{
+		{name: "connection_dropped", hangup: true, wantErr: "dataProductProperties read request failed"},
 		{name: "server_error", status: http.StatusInternalServerError, body: `{"error":"boom"}`, wantErr: "HTTP 500"},
 		{name: "bad_gateway", status: http.StatusBadGateway, body: "upstream down", wantErr: "HTTP 502"},
 		{name: "unauthorized", status: http.StatusUnauthorized, wantErr: "HTTP 401"},
@@ -128,6 +164,20 @@ func TestWriteDataProductPropertiesReadFailure(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.Method {
 				case http.MethodGet:
+					if tc.hangup {
+						hj, ok := w.(http.Hijacker)
+						if !ok {
+							t.Error("response writer does not support hijacking")
+							return
+						}
+						conn, _, err := hj.Hijack()
+						if err != nil {
+							t.Errorf("hijacking GET connection: %v", err)
+							return
+						}
+						_ = conn.Close()
+						return
+					}
 					w.WriteHeader(tc.status)
 					_, _ = w.Write([]byte(tc.body))
 				case http.MethodPost:
