@@ -4,6 +4,7 @@
 package datahub
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -53,7 +54,12 @@ func (c *Client) unmanagedAspectFields(ctx context.Context, entityPath, urn, asp
 		Value map[string]any `json:"value"`
 	}
 	if raw, ok := entity[aspectName]; ok {
-		if err := json.Unmarshal(raw, &aspect); err != nil {
+		// UseNumber keeps numbers as json.Number, which writes back the exact
+		// literal it read. Plain decoding goes through float64 and rounds PDL
+		// longs above 2^53, corrupting fields the caller never touched.
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.UseNumber()
+		if err := dec.Decode(&aspect); err != nil {
 			return nil, fmt.Errorf("parsing %s aspect: %w", aspectName, err)
 		}
 	}
