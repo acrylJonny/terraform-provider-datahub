@@ -11,6 +11,36 @@ import (
 	"testing"
 )
 
+// TestUnmanagedAspectFieldsRequestsOnlyItsAspect checks the read asks for the
+// one aspect it preserves. Without the filter the entity endpoint returns
+// every aspect the entity has, all of which is discarded.
+func TestUnmanagedAspectFieldsRequestsOnlyItsAspect(t *testing.T) {
+	const urn = "urn:li:dataProduct:orders"
+
+	var gotPath, gotAspects string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			gotPath = r.URL.Path
+			gotAspects = r.URL.Query().Get("aspects")
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_, _ = w.Write([]byte("[]"))
+	}))
+	defer server.Close()
+	c := newTestClient(t, server)
+
+	if err := c.WriteDataProductProperties(t.Context(), urn, "Orders", "", "", nil, ""); err != nil {
+		t.Fatalf("WriteDataProductProperties() error = %v", err)
+	}
+	if want := "/openapi/v3/entity/dataproduct/" + urn; gotPath != want {
+		t.Errorf("GET path = %q, want %q", gotPath, want)
+	}
+	if gotAspects != "dataProductProperties" {
+		t.Errorf("GET aspects = %q, want %q", gotAspects, "dataProductProperties")
+	}
+}
+
 // TestUnmanagedAspectFieldsKeepsIntegersExact guards the round trip of numbers
 // the provider does not model. PDL longs (audit-stamp times, corpUserInfo's
 // departmentId) are 64-bit, and decoding them into float64 rounds any value
